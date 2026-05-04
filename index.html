@@ -1,335 +1,389 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Home, 
-  ShoppingCart, 
-  Trash2, 
-  Refrigerator, 
-  AlertTriangle, 
-  CheckCircle, 
-  Info,
-  Plus,
-  ShieldAlert,
-  Leaf
-} from 'lucide-react';
-
-// --- Mock Data ---
-const initialInventory = [
-  { id: 1, name: 'Ham (Sliced)', quantity: 2, unit: 'packs', daysToExpiry: 4, category: 'Meat' },
-  { id: 2, name: 'Whole Milk', quantity: 1, unit: 'liter', daysToExpiry: 1, category: 'Dairy' },
-  { id: 3, name: 'Apples', quantity: 5, unit: 'pcs', daysToExpiry: 10, category: 'Produce' },
-  { id: 4, name: 'Yogurt', quantity: 2, unit: 'cups', daysToExpiry: -1, category: 'Dairy' }, // Expired
-];
-
-const initialWaste = [
-  { id: 1, name: 'Bread', reason: 'Spoiled', date: '2026-05-01', weight: '200g', edible: false },
-];
-
-export default function App() {
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [inventory, setInventory] = useState(initialInventory);
-  const [wasteLog, setWasteLog] = useState(initialWaste);
-  const [shopInput, setShopInput] = useState('');
-  const [toast, setToast] = useState(null);
-  
-  // Custom Toast Notification
-  const showToast = (message, type = 'info') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  };
-
-  const getStatusColor = (days) => {
-    if (days < 0) return 'text-red-500 bg-red-500/10 border-red-500/20';
-    if (days <= 2) return 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20';
-    return 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20';
-  };
-
-  const getStatusText = (days) => {
-    if (days < 0) return 'Expired';
-    if (days === 0) return 'Expires Today';
-    return `Expires in ${days}d`;
-  };
-
-  // --- Actions ---
-
-  const handleSmartShopAdd = (e) => {
-    e.preventDefault();
-    if (!shopInput.trim()) return;
-
-    // Check if item exists and is NOT expired
-    const existingItem = inventory.find(
-      item => item.name.toLowerCase().includes(shopInput.toLowerCase().trim()) && item.daysToExpiry >= 0
-    );
-
-    if (existingItem) {
-      showToast(
-        `Eco-Block: You already have ${existingItem.quantity} ${existingItem.unit} of ${existingItem.name} at home! Consume it first.`,
-        'warning'
-      );
-    } else {
-      // Add the newly "purchased" item directly to the inventory
-      const newItem = {
-        id: Date.now(),
-        name: shopInput.trim(),
-        quantity: 1,
-        unit: 'pack',
-        daysToExpiry: 7, // Defaulting to 7 days for new purchases
-        category: 'Groceries'
-      };
-      
-      setInventory([...inventory, newItem]);
-      showToast(`Purchased ${shopInput.trim()}! Added to your Fridge inventory.`, 'success');
-    }
-    setShopInput('');
-  };
-
-  const handleThrowAway = (item) => {
-    if (item.daysToExpiry >= 0) {
-      // The Conscious Bin refuses!
-      showToast(
-        `Conscious Bin Refusal: The ${item.name} is still edible! Suggestion: Check recipe app for ideas.`,
-        'error'
-      );
-    } else {
-      // Allow throwing away expired items
-      setInventory(inventory.filter(i => i.id !== item.id));
-      setWasteLog([
-        { id: Date.now(), name: item.name, reason: 'Expired', date: new Date().toISOString().split('T')[0], weight: 'N/A', edible: false },
-        ...wasteLog
-      ]);
-      showToast(`${item.name} logged in waste bin. Try to eat it sooner next time!`, 'info');
-    }
-  };
-
-  // --- Views ---
-
-  const renderDashboard = () => {
-    const expiringSoon = inventory.filter(i => i.daysToExpiry >= 0 && i.daysToExpiry <= 2).length;
-    const expired = inventory.filter(i => i.daysToExpiry < 0).length;
-    const totalItems = inventory.length;
-
-    return (
-      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <h2 className="text-2xl font-bold tracking-tight text-white">Household Overview</h2>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EcoFeast</title>
+    <!-- Tailwind CSS pro stylování -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide ikony -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Animace zkopírované z původní React verze */
+        @keyframes slide-in-bottom { 
+            from { transform: translateY(1rem); opacity: 0; } 
+            to { transform: translateY(0); opacity: 1; } 
+        }
+        @keyframes slide-in-top { 
+            from { transform: translateY(-1rem); opacity: 0; } 
+            to { transform: translateY(0); opacity: 1; } 
+        }
+        .animate-in { 
+            animation: slide-in-bottom 0.5s ease-out forwards; 
+        }
+        .toast-enter { 
+            animation: slide-in-top 0.3s ease-out forwards; 
+        }
+        .pb-safe { 
+            padding-bottom: env(safe-area-inset-bottom, 16px); 
+        }
         
-        <div className="grid grid-cols-2 gap-4">
-          <div className="p-4 rounded-2xl bg-slate-800 border border-slate-700 shadow-lg">
-            <div className="flex items-center gap-2 text-emerald-400 mb-2">
-              <CheckCircle size={20} />
-              <h3 className="font-semibold">Good Status</h3>
-            </div>
-            <p className="text-3xl font-bold text-white">{totalItems - expiringSoon - expired}</p>
-            <p className="text-sm text-slate-400 mt-1">Items fresh</p>
-          </div>
-          
-          <div className="p-4 rounded-2xl bg-slate-800 border border-slate-700 shadow-lg">
-            <div className="flex items-center gap-2 text-yellow-400 mb-2">
-              <AlertTriangle size={20} />
-              <h3 className="font-semibold">Expiring Soon</h3>
-            </div>
-            <p className="text-3xl font-bold text-white">{expiringSoon}</p>
-            <p className="text-sm text-slate-400 mt-1">Need attention</p>
-          </div>
-        </div>
+        /* Skrytí posuvníků pro lepší "app" dojem */
+        ::-webkit-scrollbar { width: 0px; background: transparent; }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-950 flex justify-center text-slate-200 font-sans selection:bg-emerald-500/30">
 
-        <div className="p-6 rounded-2xl bg-gradient-to-br from-emerald-900/40 to-slate-800 border border-emerald-500/20 shadow-lg">
-          <div className="flex justify-between items-start">
-            <div>
-              <h3 className="text-lg font-semibold text-emerald-400 mb-1">Eco Score</h3>
-              <p className="text-4xl font-bold text-white mb-2">92<span className="text-xl text-slate-400">/100</span></p>
-              <p className="text-sm text-slate-400">Top 10% in your neighborhood</p>
-            </div>
-            <div className="p-3 bg-emerald-500/20 rounded-full">
-              <Leaf className="text-emerald-400" size={32} />
-            </div>
-          </div>
-          
-          <div className="mt-6 space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-300">Monthly Savings</span>
-              <span className="text-emerald-400 font-medium">+$42.50</span>
-            </div>
-            <div className="w-full bg-slate-700 rounded-full h-2">
-              <div className="bg-emerald-400 h-2 rounded-full" style={{ width: '75%' }}></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderInventory = () => (
-    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold tracking-tight text-white">FridgeEye™ Tracker</h2>
-        <span className="px-3 py-1 bg-slate-800 rounded-full text-xs font-medium text-slate-300 border border-slate-700">
-          Syncing Live
-        </span>
-      </div>
-
-      <div className="space-y-3">
-        {inventory.map(item => (
-          <div key={item.id} className="flex items-center justify-between p-4 rounded-xl bg-slate-800 border border-slate-700 shadow-sm">
-            <div className="flex flex-col">
-              <span className="text-lg font-medium text-slate-100">{item.name}</span>
-              <span className="text-sm text-slate-400">{item.quantity} {item.unit} • {item.category}</span>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(item.daysToExpiry)}`}>
-                {getStatusText(item.daysToExpiry)}
-              </span>
-              <button 
-                onClick={() => handleThrowAway(item)}
-                className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded-lg transition-colors"
-                title="Throw in Conscious Bin"
-              >
-                <Trash2 size={18} />
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  const renderSmartShop = () => (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <h2 className="text-2xl font-bold tracking-tight text-white">SmartShop AI</h2>
-      <p className="text-slate-400">Our AI cross-references your planned purchases with your home inventory to prevent redundant buying.</p>
-
-      <form onSubmit={handleSmartShopAdd} className="relative">
-        <input 
-          type="text" 
-          value={shopInput}
-          onChange={(e) => setShopInput(e.target.value)}
-          placeholder="e.g., Ham, Milk, Bread..."
-          className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl py-4 pl-4 pr-12 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all shadow-inner"
-        />
-        <button 
-          type="submit"
-          className="absolute right-2 top-2 bottom-2 bg-emerald-500 hover:bg-emerald-600 text-slate-900 p-2 rounded-lg transition-colors font-bold flex items-center justify-center"
-        >
-          <Plus size={20} />
-        </button>
-      </form>
-
-      <div className="p-4 bg-blue-900/20 border border-blue-500/20 rounded-xl flex gap-3 items-start">
-        <Info className="text-blue-400 shrink-0 mt-0.5" size={20} />
-        <p className="text-sm text-blue-200">
-          Try typing <strong className="text-white bg-blue-500/30 px-1 rounded">Ham</strong> in the box above to see the predictive "Eco-Block" in action.
-        </p>
-      </div>
-    </div>
-  );
-
-  const renderBin = () => (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-slate-800 rounded-lg text-slate-300">
-          <Trash2 size={24} />
-        </div>
-        <h2 className="text-2xl font-bold tracking-tight text-white">Conscious Bin Log</h2>
-      </div>
-      
-      <div className="p-4 bg-slate-800 border border-slate-700 rounded-xl space-y-4">
-        <p className="text-sm text-slate-400 border-b border-slate-700 pb-4">
-          This bin uses weight sensors and computer vision. It tracks waste and actively refuses edible food.
-        </p>
-
-        <div className="space-y-3 pt-2">
-          {wasteLog.map(item => (
-            <div key={item.id} className="flex justify-between items-center py-2">
-              <div>
-                <p className="text-white font-medium">{item.name}</p>
-                <p className="text-xs text-slate-400">{item.date} • {item.weight}</p>
-              </div>
-              <span className="px-3 py-1 bg-slate-900 text-slate-300 rounded-full text-xs border border-slate-700">
-                Reason: {item.reason}
-              </span>
-            </div>
-          ))}
-          {wasteLog.length === 0 && (
-            <p className="text-center text-slate-500 py-4">No waste logged yet! Great job.</p>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="min-h-screen bg-slate-950 flex justify-center text-slate-200 font-sans selection:bg-emerald-500/30">
-      {/* Mobile App Container Simulation */}
-      <div className="w-full max-w-md bg-slate-900 flex flex-col relative shadow-2xl overflow-hidden sm:border-x border-slate-800">
+    <!-- Mobile App Container -->
+    <div class="w-full max-w-md bg-slate-900 flex flex-col relative shadow-2xl overflow-hidden sm:border-x border-slate-800">
         
-        {/* Header */}
-        <header className="pt-12 pb-4 px-6 bg-slate-900/80 backdrop-blur-md sticky top-0 z-10 border-b border-slate-800">
-          <div className="flex items-center gap-2 text-emerald-400">
-            <Leaf size={24} />
-            <h1 className="text-xl font-bold tracking-wide text-white">EcoFeast</h1>
-          </div>
+        <!-- Header -->
+        <header class="pt-12 pb-4 px-6 bg-slate-900/80 backdrop-blur-md sticky top-0 z-10 border-b border-slate-800">
+            <div class="flex items-center gap-2 text-emerald-400">
+                <i data-lucide="leaf" class="w-6 h-6"></i>
+                <h1 class="text-xl font-bold tracking-wide text-white">EcoFeast</h1>
+            </div>
         </header>
 
-        {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto p-6 pb-24">
-          {activeTab === 'dashboard' && renderDashboard()}
-          {activeTab === 'inventory' && renderInventory()}
-          {activeTab === 'shop' && renderSmartShop()}
-          {activeTab === 'bin' && renderBin()}
+        <!-- Main Content Area -->
+        <main id="app-content" class="flex-1 overflow-y-auto p-6 pb-24">
+            <!-- Content will be injected here by JS -->
         </main>
 
-        {/* Bottom Navigation */}
-        <nav className="absolute bottom-0 left-0 w-full bg-slate-900 border-t border-slate-800 px-6 py-4 flex justify-between items-center z-20 pb-safe">
-          <button 
-            onClick={() => setActiveTab('dashboard')}
-            className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'dashboard' ? 'text-emerald-400' : 'text-slate-500 hover:text-slate-300'}`}
-          >
-            <Home size={24} />
-            <span className="text-[10px] font-medium uppercase tracking-wider">Home</span>
-          </button>
-          
-          <button 
-            onClick={() => setActiveTab('inventory')}
-            className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'inventory' ? 'text-emerald-400' : 'text-slate-500 hover:text-slate-300'}`}
-          >
-            <Refrigerator size={24} />
-            <span className="text-[10px] font-medium uppercase tracking-wider">Fridge</span>
-          </button>
-          
-          <button 
-            onClick={() => setActiveTab('shop')}
-            className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'shop' ? 'text-emerald-400' : 'text-slate-500 hover:text-slate-300'}`}
-          >
-            <ShoppingCart size={24} />
-            <span className="text-[10px] font-medium uppercase tracking-wider">Shop</span>
-          </button>
-          
-          <button 
-            onClick={() => setActiveTab('bin')}
-            className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'bin' ? 'text-emerald-400' : 'text-slate-500 hover:text-slate-300'}`}
-          >
-            <Trash2 size={24} />
-            <span className="text-[10px] font-medium uppercase tracking-wider">Bin</span>
-          </button>
+        <!-- Bottom Navigation -->
+        <nav class="absolute bottom-0 left-0 w-full bg-slate-900 border-t border-slate-800 px-6 py-4 flex justify-between items-center z-20 pb-safe">
+            <button onclick="navigate('dashboard')" id="nav-dashboard" class="nav-btn flex flex-col items-center gap-1 transition-colors text-emerald-400">
+                <i data-lucide="home" class="w-6 h-6"></i>
+                <span class="text-[10px] font-medium uppercase tracking-wider">Home</span>
+            </button>
+            
+            <button onclick="navigate('inventory')" id="nav-inventory" class="nav-btn flex flex-col items-center gap-1 transition-colors text-slate-500 hover:text-slate-300">
+                <i data-lucide="refrigerator" class="w-6 h-6"></i>
+                <span class="text-[10px] font-medium uppercase tracking-wider">Fridge</span>
+            </button>
+            
+            <button onclick="navigate('shop')" id="nav-shop" class="nav-btn flex flex-col items-center gap-1 transition-colors text-slate-500 hover:text-slate-300">
+                <i data-lucide="shopping-cart" class="w-6 h-6"></i>
+                <span class="text-[10px] font-medium uppercase tracking-wider">Shop</span>
+            </button>
+            
+            <button onclick="navigate('bin')" id="nav-bin" class="nav-btn flex flex-col items-center gap-1 transition-colors text-slate-500 hover:text-slate-300">
+                <i data-lucide="trash-2" class="w-6 h-6"></i>
+                <span class="text-[10px] font-medium uppercase tracking-wider">Bin</span>
+            </button>
         </nav>
 
-        {/* Custom Toast Notification System */}
-        {toast && (
-          <div className="absolute top-20 left-4 right-4 z-50 animate-in slide-in-from-top-4 fade-in duration-300">
-            <div className={`p-4 rounded-xl shadow-xl border flex gap-3 items-start ${
-              toast.type === 'error' ? 'bg-red-950 border-red-500/50 text-red-200' :
-              toast.type === 'warning' ? 'bg-amber-950 border-amber-500/50 text-amber-200' :
-              toast.type === 'success' ? 'bg-emerald-950 border-emerald-500/50 text-emerald-200' :
-              'bg-slate-800 border-slate-700 text-slate-200'
-            }`}>
-              {toast.type === 'error' && <ShieldAlert className="shrink-0 mt-0.5 text-red-500" size={20} />}
-              {toast.type === 'warning' && <AlertTriangle className="shrink-0 mt-0.5 text-amber-500" size={20} />}
-              {toast.type === 'success' && <CheckCircle className="shrink-0 mt-0.5 text-emerald-500" size={20} />}
-              {toast.type === 'info' && <Info className="shrink-0 mt-0.5 text-slate-400" size={20} />}
-              <p className="text-sm font-medium leading-tight">{toast.message}</p>
+        <!-- Toast Notification Container -->
+        <div id="toast-container" class="absolute top-20 left-4 right-4 z-50 hidden toast-enter">
+            <div id="toast-body" class="p-4 rounded-xl shadow-xl border flex gap-3 items-start">
+                <div id="toast-icon-wrapper" class="shrink-0 mt-0.5"></div>
+                <p id="toast-message" class="text-sm font-medium leading-tight"></p>
             </div>
-          </div>
-        )}
-      </div>
+        </div>
+
     </div>
-  );
-}
+
+    <script>
+        // --- State Management ---
+        const state = {
+            activeTab: 'dashboard',
+            inventory: [
+                { id: 1, name: 'Ham (Sliced)', quantity: 2, unit: 'packs', daysToExpiry: 4, category: 'Meat' },
+                { id: 2, name: 'Whole Milk', quantity: 1, unit: 'liter', daysToExpiry: 1, category: 'Dairy' },
+                { id: 3, name: 'Apples', quantity: 5, unit: 'pcs', daysToExpiry: 10, category: 'Produce' },
+                { id: 4, name: 'Yogurt', quantity: 2, unit: 'cups', daysToExpiry: -1, category: 'Dairy' },
+            ],
+            wasteLog: [
+                { id: 1, name: 'Bread', reason: 'Spoiled', date: '2026-05-01', weight: '200g', edible: false },
+            ]
+        };
+
+        // --- Utils ---
+        function getStatusColor(days) {
+            if (days < 0) return 'text-red-500 bg-red-500/10 border-red-500/20';
+            if (days <= 2) return 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20';
+            return 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20';
+        }
+
+        function getStatusText(days) {
+            if (days < 0) return 'Expired';
+            if (days === 0) return 'Expires Today';
+            return `Expires in ${days}d`;
+        }
+
+        // --- Toast System ---
+        let toastTimeout;
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const body = document.getElementById('toast-body');
+            const iconWrapper = document.getElementById('toast-icon-wrapper');
+            const msgEl = document.getElementById('toast-message');
+
+            clearTimeout(toastTimeout);
+            
+            // Reset classes
+            body.className = 'p-4 rounded-xl shadow-xl border flex gap-3 items-start ';
+            
+            let iconHtml = '';
+            if (type === 'error') {
+                body.className += 'bg-red-950 border-red-500/50 text-red-200';
+                iconHtml = '<i data-lucide="shield-alert" class="w-5 h-5 text-red-500"></i>';
+            } else if (type === 'warning') {
+                body.className += 'bg-amber-950 border-amber-500/50 text-amber-200';
+                iconHtml = '<i data-lucide="alert-triangle" class="w-5 h-5 text-amber-500"></i>';
+            } else if (type === 'success') {
+                body.className += 'bg-emerald-950 border-emerald-500/50 text-emerald-200';
+                iconHtml = '<i data-lucide="check-circle" class="w-5 h-5 text-emerald-500"></i>';
+            } else {
+                body.className += 'bg-slate-800 border-slate-700 text-slate-200';
+                iconHtml = '<i data-lucide="info" class="w-5 h-5 text-slate-400"></i>';
+            }
+
+            iconWrapper.innerHTML = iconHtml;
+            msgEl.textContent = message;
+            
+            container.classList.remove('hidden');
+            lucide.createIcons();
+
+            toastTimeout = setTimeout(() => {
+                container.classList.add('hidden');
+            }, 4000);
+        }
+
+        // --- Actions ---
+        window.navigate = function(tab) {
+            state.activeTab = tab;
+            
+            // Update Nav UI
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('text-emerald-400');
+                btn.classList.add('text-slate-500');
+            });
+            const activeBtn = document.getElementById(`nav-${tab}`);
+            activeBtn.classList.remove('text-slate-500');
+            activeBtn.classList.add('text-emerald-400');
+
+            render();
+        };
+
+        window.submitShop = function(e) {
+            e.preventDefault();
+            const inputEl = document.getElementById('shop-input');
+            const shopInput = inputEl.value.trim();
+            if (!shopInput) return;
+
+            const existingItem = state.inventory.find(
+                item => item.name.toLowerCase().includes(shopInput.toLowerCase()) && item.daysToExpiry >= 0
+            );
+
+            if (existingItem) {
+                showToast(
+                    `Eco-Block: You already have ${existingItem.quantity} ${existingItem.unit} of ${existingItem.name} at home! Consume it first.`,
+                    'warning'
+                );
+            } else {
+                const newItem = {
+                    id: Date.now(),
+                    name: shopInput,
+                    quantity: 1,
+                    unit: 'pack',
+                    daysToExpiry: 7,
+                    category: 'Groceries'
+                };
+                state.inventory.push(newItem);
+                showToast(`Purchased ${shopInput}! Added to your Fridge inventory.`, 'success');
+            }
+            inputEl.value = '';
+            // Only re-render if we added something, to avoid losing focus otherwise, 
+            // but for simplicity we can just clear the input box above.
+        };
+
+        window.throwAway = function(id) {
+            const itemIndex = state.inventory.findIndex(i => i.id === id);
+            if (itemIndex === -1) return;
+            const item = state.inventory[itemIndex];
+
+            if (item.daysToExpiry >= 0) {
+                showToast(
+                    `Conscious Bin Refusal: The ${item.name} is still edible! Suggestion: Check recipe app for ideas.`,
+                    'error'
+                );
+            } else {
+                state.inventory.splice(itemIndex, 1);
+                state.wasteLog.unshift({
+                    id: Date.now(),
+                    name: item.name,
+                    reason: 'Expired',
+                    date: new Date().toISOString().split('T')[0],
+                    weight: 'N/A',
+                    edible: false
+                });
+                showToast(`${item.name} logged in waste bin. Try to eat it sooner next time!`, 'info');
+                render(); // Re-render to show updated list
+            }
+        };
+
+        // --- Views (HTML Generators) ---
+        function getDashboardHTML() {
+            const expiringSoon = state.inventory.filter(i => i.daysToExpiry >= 0 && i.daysToExpiry <= 2).length;
+            const expired = state.inventory.filter(i => i.daysToExpiry < 0).length;
+            const totalItems = state.inventory.length;
+            const goodItems = totalItems - expiringSoon - expired;
+
+            return `
+            <div class="space-y-6 animate-in">
+                <h2 class="text-2xl font-bold tracking-tight text-white">Household Overview</h2>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="p-4 rounded-2xl bg-slate-800 border border-slate-700 shadow-lg">
+                        <div class="flex items-center gap-2 text-emerald-400 mb-2">
+                            <i data-lucide="check-circle" class="w-5 h-5"></i>
+                            <h3 class="font-semibold">Good Status</h3>
+                        </div>
+                        <p class="text-3xl font-bold text-white">${goodItems}</p>
+                        <p class="text-sm text-slate-400 mt-1">Items fresh</p>
+                    </div>
+                    
+                    <div class="p-4 rounded-2xl bg-slate-800 border border-slate-700 shadow-lg">
+                        <div class="flex items-center gap-2 text-yellow-400 mb-2">
+                            <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                            <h3 class="font-semibold">Expiring Soon</h3>
+                        </div>
+                        <p class="text-3xl font-bold text-white">${expiringSoon}</p>
+                        <p class="text-sm text-slate-400 mt-1">Need attention</p>
+                    </div>
+                </div>
+
+                <div class="p-6 rounded-2xl bg-gradient-to-br from-emerald-900/40 to-slate-800 border border-emerald-500/20 shadow-lg">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="text-lg font-semibold text-emerald-400 mb-1">Eco Score</h3>
+                            <p class="text-4xl font-bold text-white mb-2">92<span class="text-xl text-slate-400">/100</span></p>
+                            <p class="text-sm text-slate-400">Top 10% in your neighborhood</p>
+                        </div>
+                        <div class="p-3 bg-emerald-500/20 rounded-full">
+                            <i data-lucide="leaf" class="w-8 h-8 text-emerald-400"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-6 space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-slate-300">Monthly Savings</span>
+                            <span class="text-emerald-400 font-medium">+$42.50</span>
+                        </div>
+                        <div class="w-full bg-slate-700 rounded-full h-2">
+                            <div class="bg-emerald-400 h-2 rounded-full" style="width: 75%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function getInventoryHTML() {
+            let itemsHtml = state.inventory.map(item => `
+                <div class="flex items-center justify-between p-4 rounded-xl bg-slate-800 border border-slate-700 shadow-sm">
+                    <div class="flex flex-col">
+                        <span class="text-lg font-medium text-slate-100">${item.name}</span>
+                        <span class="text-sm text-slate-400">${item.quantity} ${item.unit} • ${item.category}</span>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <span class="px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(item.daysToExpiry)}">
+                            ${getStatusText(item.daysToExpiry)}
+                        </span>
+                        <button onclick="throwAway(${item.id})" class="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded-lg transition-colors" title="Throw in Conscious Bin">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+
+            return `
+            <div class="space-y-4 animate-in">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold tracking-tight text-white">FridgeEye™ Tracker</h2>
+                    <span class="px-3 py-1 bg-slate-800 rounded-full text-xs font-medium text-slate-300 border border-slate-700">Syncing Live</span>
+                </div>
+                <div class="space-y-3">${itemsHtml}</div>
+            </div>`;
+        }
+
+        function getShopHTML() {
+            return `
+            <div class="space-y-6 animate-in">
+                <h2 class="text-2xl font-bold tracking-tight text-white">SmartShop AI</h2>
+                <p class="text-slate-400">Our AI cross-references your planned purchases with your home inventory to prevent redundant buying.</p>
+
+                <form onsubmit="submitShop(event)" class="relative">
+                    <input type="text" id="shop-input" placeholder="e.g., Ham, Milk, Bread..." autocomplete="off"
+                        class="w-full bg-slate-800 border border-slate-700 text-white rounded-xl py-4 pl-4 pr-12 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all shadow-inner">
+                    <button type="submit" class="absolute right-2 top-2 bottom-2 bg-emerald-500 hover:bg-emerald-600 text-slate-900 p-2 rounded-lg transition-colors font-bold flex items-center justify-center">
+                        <i data-lucide="plus" class="w-5 h-5"></i>
+                    </button>
+                </form>
+
+                <div class="p-4 bg-blue-900/20 border border-blue-500/20 rounded-xl flex gap-3 items-start">
+                    <i data-lucide="info" class="w-5 h-5 text-blue-400 shrink-0 mt-0.5"></i>
+                    <p class="text-sm text-blue-200">
+                        Try typing <strong class="text-white bg-blue-500/30 px-1 rounded">Ham</strong> in the box above to see the predictive "Eco-Block" in action.
+                    </p>
+                </div>
+            </div>`;
+        }
+
+        function getBinHTML() {
+            let logHtml = state.wasteLog.map(item => `
+                <div class="flex justify-between items-center py-2">
+                    <div>
+                        <p class="text-white font-medium">${item.name}</p>
+                        <p class="text-xs text-slate-400">${item.date} • ${item.weight}</p>
+                    </div>
+                    <span class="px-3 py-1 bg-slate-900 text-slate-300 rounded-full text-xs border border-slate-700">
+                        Reason: ${item.reason}
+                    </span>
+                </div>
+            `).join('');
+
+            if (state.wasteLog.length === 0) {
+                logHtml = `<p class="text-center text-slate-500 py-4">No waste logged yet! Great job.</p>`;
+            }
+
+            return `
+            <div class="space-y-6 animate-in">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-slate-800 rounded-lg text-slate-300">
+                        <i data-lucide="trash-2" class="w-6 h-6"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold tracking-tight text-white">Conscious Bin Log</h2>
+                </div>
+                
+                <div class="p-4 bg-slate-800 border border-slate-700 rounded-xl space-y-4">
+                    <p class="text-sm text-slate-400 border-b border-slate-700 pb-4">
+                        This bin uses weight sensors and computer vision. It tracks waste and actively refuses edible food.
+                    </p>
+                    <div class="space-y-3 pt-2">
+                        ${logHtml}
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        // --- Core Render Loop ---
+        function render() {
+            const content = document.getElementById('app-content');
+            if (state.activeTab === 'dashboard') content.innerHTML = getDashboardHTML();
+            else if (state.activeTab === 'inventory') content.innerHTML = getInventoryHTML();
+            else if (state.activeTab === 'shop') content.innerHTML = getShopHTML();
+            else if (state.activeTab === 'bin') content.innerHTML = getBinHTML();
+
+            // Render SVG icons for newly injected HTML
+            lucide.createIcons();
+        }
+
+        // Initialize App
+        document.addEventListener('DOMContentLoaded', () => {
+            render();
+            lucide.createIcons();
+        });
+    </script>
+</body>
+</html>
